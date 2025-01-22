@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Snap Panel with ESRI Imagery</title>
+  {% load static %}
+
+ 
+  <link rel="stylesheet" href="{% static 'css/map.css' %}">
+
+  <!-- Chart.js-->
+  <script>
+    var __backupDefine = window.define;
+    window.define = undefined;
+  </script>
+  <!-- Chart.js (CDN) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/shpjs@latest/dist/shp.min.js"></script>
+
+  <script>
+    window.define = __backupDefine;
+  </script>
+
+  <!-- ArcGIS JS API -->
+  <script src="https://js.arcgis.com/4.24/"></script>
+  
+
+
+  <style>
+    .color-picker-dialog {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background-color: white;
+      padding: 10px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      z-index: 1000;
+      display: none;
+    }
+    .dropdown-menu {
+      display: none;
+      position: absolute;
+      background-color: white;
+      box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+      z-index: 1;
+      margin-top: 10px;
+      right: 0;
+    }
+    .dropdown-menu a {
+      color: black;
+      padding: 12px 16px;
+      text-decoration: none;
+      display: block;
+    }
+    .dropdown-menu a:hover {
+      background-color: #f1f1f1;
+    }
+
+    /* Modal pencere (for graphic) */
+    #chartModal {
+      display: none;
+      position: fixed;
+      z-index: 9999;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.5);
+    }
+    #chartModalContent {
+      background: #fff;
+      margin: 100px auto;
+      padding: 20px;
+      width: 50%;
+      position: relative;
+    }
+    #closeChartModal {
+      float: right;
+      cursor: pointer;
+      background-color: #f44336;
+      color: #fff;
+      border: none;
+      padding: 5px 10px;
+    }
+
+    /* Navbar */
+    .navbar {
+      height: 50px;
+      background: #2e2e2e;
+      display: flex;
+      align-items: center;
+      color: #fff;
+      padding: 0 15px;
+    }
+    .navbar .brand {
+      font-weight: bold;
+      font-size: 18px;
+    }
+    .profile {
+      margin-left: auto;
+      position: relative;
+      cursor: pointer;
+    }
+    .profile img {
+      vertical-align: middle;
+      border-radius: 50%;
+    }
+
+    /*
+      ANALİZ BUTONUNU
+      sağ üst tərəfdən, yuxarıdan 200px, sağdan 20px
+    */
+    .analysis-button-container {
+      position: absolute;
+      top: 200px;
+      right: 20px;
+      z-index: 1000;
+    }
+    .analysis-button-container-azot {
+      position: absolute;
+      top: 250px;
+      right: 20px;
+      z-index: 1000;
+    }
+
+    .analysis-button-container-click {
+      position: absolute;
+      top: 300px;
+      right: 20px;
+      z-index: 1000;
+    }
+
+    .analysis-button-container-ruler {
+      position: absolute;
+      top: 350px;
+      right: 20px;
+      z-index: 1000;
+    }
+
+    .analysis-button-container-merge {
+      position: absolute;
+      top: 400px;
+      right: 20px;
+      z-index: 1000;
+    }
+
+    .analysis-button-container-attribute {
+      position: absolute;
+      top: 450px;
+      right: 20px;
+      z-index: 1000;
+    }
+
+    .analysis-button-container-split {
+      position: absolute;
+      top: 500px;
+      right: 20px;
+      z-index: 1000;
+    }
+
+    .analysis-button-container-save {
+      position: absolute;
+      top: 550px;
+      right: 20px;
+      z-index: 1000;
+    }
+
+    
+    .esri-button {
+      background-color: white;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      padding: 8px 12px;
+      font-size: 14px;
+      cursor: pointer;
+      font-family: 'Avenir Next', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .esri-button:hover {
+      background-color: #005b90;
+    }
+    .esri-button img {
+      width: 20px; height: 20px;
+    }
+    .stylecolorimg {
+      width: 20px; height: 20px;
+    }
+
+    /* download graphic */
+    #downloadChart {
+      float: left;
+      cursor: pointer;
+      background-color: #4CAF50;
+      color: #fff;
+      border: none;
+      padding: 5px 10px;
+      margin-right: 10px;
+      border-radius: 4px;
+    }
+    #downloadChart:hover {
+      background-color: #45A049;
+    }
+
+    /* DRAG & DROP - .checkbox-container */
+    .checkbox-container.drag-over {
+      border: 2px dashed #000;
+      margin: 2px;
+    }
+
+
+    /* Modal penceresi dizaynı */
+.modal {
+  display: none; /* default olaraq gizli */
+  position: fixed;
+  z-index: 1; /* en yuxarıda saxla */
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto; /* Hərəkət etməyi dayandır */
+  background-color: rgba(0, 0, 0, 0.4); /* Arxa planı şəffaf etdir */
+}
+
+.modal-content {
+  background-color: #fff;
+  margin: 15% auto;
+  padding: 20px;
+  border: 1px solid #888;
+  width: 80%;
+  max-width: 500px;
+}
+
+.close {
+  color: #aaa;
+  font-size: 28px;
+  font-weight: bold;
+  float: right;
+}
+
+.close:hover,
+.close:focus {
+  color: black;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+  </style>
+</head>
+<body>
+  <div class="navbar">
+    <div class="brand">CİS KT Sistem</div>
+    <div class="profile" onclick="toggleDropdown()">
+      <img src="{% static 'img/user.png' %}" alt="Profile Icon">
+      {{ request.user.first_name }} {{ request.user.last_name }}
+      <div class="dropdown-menu" id="profileMenu">
+        <a href="{% url 'myprofile' %}">Mənim profilim</a>
+        <a href="{% url 'logout' %}">Çıxış et</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="analysis-button-container">
+    <button id="analyzeButton" class="esri-button" title="İllər üzrə məhsuldarlıq fərqi">
+      <img
+        id="analysisIcon"
+        src="{% static 'img/analysis.png' %}"
+        alt="Analiz icon"
+      >
+    </button>
+  </div>
+
+
+  <div class="analysis-button-container-azot">
+    <button id="analyzeAzotButton" class="esri-button" title="Mehsuldarlıq və Azot arasındakı əlaqə">
+      <img
+        id="analysisAzotIcon"
+        src="{% static 'img/regression.png' %}"
+        alt="Azot icon"
+      >
+    </button>
+  </div>
+
+
+  <div class="analysis-button-container-click">
+    <button id="analyzeclickButton" class="esri-button" title="Seçim">
+      <img
+        id="analysisclikIcon"
+        src="{% static 'img/add.png' %}"
+        alt="Click icon"
+      >
+    </button>
+    <input type="file" id="shapefileInput" accept=".zip" style="display: none;" />
+  </div>
+
+ 
+  <div class="analysis-button-container-ruler">
+    <button id="analyzeRulerButton" class="esri-button" title="Ölçmə">
+      <img
+        id="analysisRulerIcon"
+        src="{% static 'img/ruler.png' %}"
+        alt="Ruler icon"
+      >
+    </button>
+  </div>
+
+
+
+  <div class="analysis-button-container-merge">
+    <button id="analyzeMergeButton" class="esri-button" title="Birləşdir">
+      <img
+        id="analysisMergeIcon"
+        src="{% static 'img/consolidate.png' %}"
+        alt="Merge icon"
+      >
+    </button>
+  </div>
+
+
+
+  <div class="analysis-button-container-attribute">
+    <button id="analyzeAttributeButton" class="esri-button" title="Attribut">
+      <img
+        id="analysisAttributeIcon"
+        src="{% static 'img/search.png' %}"
+        alt="Attribute icon"
+      >
+    </button>
+  </div>
+
+
+  <div class="analysis-button-container-save">
+    <button id="analyzeSaveButton" class="esri-button" title="Save">
+      <img
+        id="analysisSaveIcon"
+        src="{% static 'img/save.png' %}"
+        alt="Save icon"
+      >
+    </button>
+  </div>
+
+
+  
+
+
+
+<div id="attributeModal" class="modal">
+  <div class="modal-content">
+    <span class="close" id="modalClose">&times;</span>
+    <h2>Attribut məlumatı</h2>
+    <p id="saheValue"></p>
+    <p id="mehTValue"></p>
+  </div>
+</div>
+
+
+ 
+  <div class="analysis-button-container-split">
+    <button id="analyzeSplitButton" class="esri-button" title="Poliqonu böl">
+      <img
+        id="analysisSplitIcon"
+        src="{% static 'img/split.png' %}"
+        alt="Split icon"
+      >
+    </button>
+  </div>
+
+  <!-- Map container -->
+  <div id="map">
+    <script>
+      function toggleDropdown() {
+        var dropdown = document.getElementById('profileMenu');
+        dropdown.style.display = (dropdown.style.display === 'block') ? 'none' : 'block';
+      }
+    
+      window.onclick = function(event) {
+        if (!event.target.matches('.profile img')) {
+          var dropdowns = document.getElementsByClassName("dropdown-menu");
+          for (var i = 0; i < dropdowns.length; i++) {
+            var openDropdown = dropdowns[i];
+            if (openDropdown.style.display === 'block') {
+              openDropdown.style.display = 'none';
+            }
+          }
+        }
+      };
+    
+      document.addEventListener('DOMContentLoaded', function() {
+        var myChart = null;
+        var map, view;
+        var geoJsonLayer, geoJsonLayer2, geoJsonLayer3;
+        var selectedGraphic = null;
+    
+        // ---------------------------
+        // Kəsilən poliqonları tutacaq
+        // ---------------------------
+        var splittedPolygons = [];
+        var originalObjectID = null;
+        // ---------------------------
+    
+        require([
+          "esri/Map",
+          "esri/views/MapView",
+          "esri/layers/TileLayer",
+          "esri/layers/GeoJSONLayer",
+          "esri/Graphic",
+          "esri/widgets/Sketch", // Sketch widget for drawing shapes
+          "esri/layers/GraphicsLayer",
+          "esri/geometry/Polygon",
+          "esri/geometry/geometryEngine"
+        ], function (Map, MapView, TileLayer, GeoJSONLayer, Graphic, Sketch, GraphicsLayer, Polygon, geometryEngine) {
+    
+          var imageryLayer = new TileLayer({
+            url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer"
+          });
+    
+          map = new Map({
+            layers: [imageryLayer]
+          });
+    
+          view = new MapView({
+            container: "map",
+            map: map,
+            center: [47.5721, 40.1431],
+            zoom: 8
+          });
+    
+          // create layers
+          geoJsonLayer = new GeoJSONLayer({
+            url: "/user-geojson/",  // Geojson data for user
+            renderer: {
+              type: "simple",
+              symbol: {
+                type: "simple-line",
+                color: "blue",
+                width: 2
+              }
+            }
+          });
+    
+          geoJsonLayer2 = new GeoJSONLayer({
+            url: "{% static 'geojson/rayon.geojson' %}",
+            renderer: {
+              type: "simple",
+              symbol: {
+                type: "simple-line",
+                color: "green",
+                width: 2
+              }
+            }
+          });
+    
+          geoJsonLayer3 = new GeoJSONLayer({
+            url: "{% static 'geojson/torpaq.geojson' %}",
+            outFields: ["*"],
+            renderer: {
+              type: "simple",
+              symbol: {
+                type: "simple-fill",
+                color: "orange",
+                style: "solid",
+                outline: { color: "black", width: 1 }
+              }
+            }
+          });
+    
+          
+          map.addMany([geoJsonLayer, geoJsonLayer2, geoJsonLayer3]);
+    
+          // Checkbox event
+          document.getElementById('torpaqLayer').addEventListener('change', function() {
+            if (this.checked) { map.add(geoJsonLayer); }
+            else { map.remove(geoJsonLayer); }
+          });
+          document.getElementById('tikiliLayer').addEventListener('change', function() {
+            if (this.checked) { map.add(geoJsonLayer2); }
+            else { map.remove(geoJsonLayer2); }
+          });
+          document.getElementById('yolLayer').addEventListener('change', function() {
+            if (this.checked) { map.add(geoJsonLayer3); }
+            else { map.remove(geoJsonLayer3); }
+          });
+    
+          // select polygon
+view.on("click", function(event) {
+  view.hitTest(event).then(function(response) {
+    if (response.results.length) {
+      var filteredResults = response.results.filter(function(r) {
+        return r.graphic.layer === geoJsonLayer 
+            || r.graphic.layer === geoJsonLayer2
+            || r.graphic.layer === geoJsonLayer3;
+      });
+
+      if (filteredResults.length > 0) {
+        var graphic = filteredResults[0].graphic;
+        console.log("Seçilen Graphic:", graphic);
+
+        // color for selected feature
+        graphic.symbol = {
+          type: "simple-fill",
+          color: [255, 0, 0, 0.5],
+          style: "solid",
+          outline: { color: [255, 255, 0], width: 2 }
+        };
+
+        // clear last selection
+        if (selectedGraphic) {
+          view.graphics.remove(selectedGraphic);
+        }
+
+        // add selected new object
+        view.graphics.add(graphic);
+        selectedGraphic = graphic;
+
+        // take selected polygon object id
+        if (selectedGraphic.attributes && selectedGraphic.attributes.OBJECTID) {
+          originalObjectID = selectedGraphic.attributes.OBJECTID;
+        } else {
+          originalObjectID = null;
+        }
+      }
+    } else {
+   
+      if (selectedGraphic) {
+        view.graphics.remove(selectedGraphic);
+        selectedGraphic = null;
+        originalObjectID = null;
+      }
+    }
+  });
+});
+    
+          // measure button
+          var sketch = new Sketch({
+            view: view,
+            layer: new GraphicsLayer()
+          });
+    
+          
+          view.ui.add(sketch, "top-left");
+    
+          document.getElementById('analyzeRulerButton').addEventListener('click', function() {
+         
+            sketch.create("polygon");
+    
+            sketch.on("create", function(event) {
+              if (event.state === "complete") {
+                var polygon = event.graphic.geometry;
+                var area = geometryEngine.geodesicArea(polygon, "square-meters");
+    
+                alert("Ölçülən sahə: " + area.toFixed(2) + " m²");
+              }
+            });
+          });
+    
+ 
+          document.getElementById('analyzeAttributeButton').addEventListener('click', function() {
+            if (!selectedGraphic) {
+              alert('Xahiş olunur coğrafi obyekt seçin!');
+              return;
+            }
+    
+            var attributes = selectedGraphic.attributes;
+            var sahe = attributes["Sahe"];
+            var mehT = attributes["Meh_T"];
+    
+            // Modal'ı göster
+            var modal = document.getElementById("attributeModal");
+            var saheValue = document.getElementById("saheValue");
+            var mehTValue = document.getElementById("mehTValue");
+    
+            if (sahe !== undefined && mehT !== undefined) {
+              saheValue.textContent = "Sahə: " + sahe;
+              mehTValue.textContent = "Əkilən məhsul: " + mehT;
+              modal.style.display = "block";
+            } else {
+              alert("Seçdiyiniz poliqon üçün heç bir məlumat tapılmadı!");
+            }
+          });
+    
+          // close modal
+          var modalClose = document.getElementById("modalClose");
+          modalClose.onclick = function() {
+            document.getElementById("attributeModal").style.display = "none";
+          }
+    
+         
+          window.onclick = function(event) {
+            if (event.target === document.getElementById("attributeModal")) {
+              document.getElementById("attributeModal").style.display = "none";
+            }
+          }
+    
+          // analysis button
+          document.getElementById('analyzeButton').addEventListener('click', function() {
+            if (!selectedGraphic) {
+              alert('Xahiş olunur coğrafi bir obyekt seçin!');
+              return;
+            }
+            var attributes = selectedGraphic.attributes;
+            var years = [];
+            var values = [];
+            for (var year=2013; year<=2022; year++){
+              var key = "Meh_" + year;
+              if(attributes[key] !== undefined && attributes[key]!==null){
+                years.push(year.toString());
+                values.push(attributes[key]);
+              }
+            }
+            if(years.length===0){
+              alert("Bu poliqon üçün məhsuldarlıq məlumatı tapılmadı");
+              return;
+            }
+            openChartModal(years, values);
+          });
+    
+          // Azot və  məhsuldarlıq arasındakı əlaqə
+          document.getElementById('analyzeAzotButton').addEventListener('click', function(){
+            if(!selectedGraphic){
+              alert('Xahiş olunur coğrafi obyekt seçin!');
+              return;
+            }
+            var attributes = selectedGraphic.attributes;
+            var years=[];
+            var azotValues=[];
+            var mehValues=[];
+    
+            for(var year=2013; year<=2022; year++){
+              var azotKey="Azot_"+year;
+              var mehKey="Meh_"+year;
+              if(attributes[azotKey]!==undefined && attributes[mehKey]!==undefined){
+                years.push(year.toString());
+                azotValues.push(attributes[azotKey]);
+                mehValues.push(attributes[mehKey]);
+              }
+            }
+            if(years.length===0){
+              alert("Bu poliqonda Azot və  ya məhsuldarlıq məlumatı tapılmadı!");
+              return;
+            }
+            openChartModalAzot(years,azotValues,mehValues);
+          });
+    
+          // Reng seçimi
+          document.getElementById('azColorButton').addEventListener('click', function(){
+            openColorPicker('azColor');
+          });
+          document.getElementById('rayonColorButton').addEventListener('click', function(){
+            openColorPicker('rayonColor');
+          });
+          document.getElementById('torpaqColorButton').addEventListener('click', function(){
+            openColorPicker('torpaqColor');
+          });
+    
+          function openColorPicker(layerId){
+            var colorPickerDialog=document.getElementById('colorPickerDialog');
+            var colorInput=document.getElementById('colorInput');
+            colorPickerDialog.style.display='block';
+    
+            colorInput.oninput=function(e){
+              var c=e.target.value;
+              if(layerId==='azColor'){
+                geoJsonLayer.renderer.symbol.color=c;
+                geoJsonLayer.renderer.symbol.outline.color=c;
+              } else if(layerId==='rayonColor'){
+                geoJsonLayer2.renderer.symbol.color=c;
+                geoJsonLayer2.renderer.symbol.outline.color=c;
+              } else if(layerId==='torpaqColor'){
+                geoJsonLayer3.renderer.symbol.color=c;
+                geoJsonLayer3.renderer.symbol.outline.color=c;
+              }
+            };
+          }
+    
+          // DRAG & DROP lay sıralama
+          const containers = document.querySelectorAll('.checkbox-container');
+          containers.forEach(cont=>{
+            cont.addEventListener('dragstart', handleDragStart);
+            cont.addEventListener('dragover', handleDragOver);
+            cont.addEventListener('dragleave', handleDragLeave);
+            cont.addEventListener('drop', handleDrop);
+          });
+    
+          function handleDragStart(e){
+            e.dataTransfer.setData('text/plain', e.target.id);
+          }
+    
+          function handleDragOver(e){
+            e.preventDefault();
+            e.currentTarget.classList.add('drag-over');
+          }
+    
+          function handleDragLeave(e){
+            e.currentTarget.classList.remove('drag-over');
+          }
+    
+          function handleDrop(e){
+            e.preventDefault();
+            e.currentTarget.classList.remove('drag-over');
+            
+            const draggedId = e.dataTransfer.getData('text/plain');
+            const draggedEl = document.getElementById(draggedId);
+            const targetEl = e.currentTarget;
+    
+            targetEl.parentNode.insertBefore(draggedEl, targetEl);
+    
+            const allContainers=Array.from(document.querySelectorAll('.checkbox-container'));
+            allContainers.forEach((cont, idx)=>{
+              if(cont.id==='container-az'){ 
+                map.remove(geoJsonLayer);
+                map.add(geoJsonLayer, idx);
+              } else if(cont.id==='container-rayon'){
+                map.remove(geoJsonLayer2);
+                map.add(geoJsonLayer2, idx);
+              } else if(cont.id==='container-torpaq'){
+                map.remove(geoJsonLayer3);
+                map.add(geoJsonLayer3, idx);
+              }
+            });
+          }
+    
+          // Cut polygon
+          document.getElementById('analyzeSplitButton').addEventListener('click', function() {
+            if (!selectedGraphic) {
+              alert('Xahiş olunur coğrafi obyekt seçin!');
+              return;
+            }
+    
+           
+            splittedPolygons = [];
+    
+            var splitSketch = new Sketch({
+              view: view,
+              layer: new GraphicsLayer()
+            });
+    
+            view.ui.add(splitSketch, "top-left");
+    
+            splitSketch.create("polyline");
+    
+            splitSketch.on("create", function(event) {
+              if (event.state === "complete") {
+                var cutLine = event.graphic.geometry;
+                var polygon = selectedGraphic.geometry;
+    
+                var cutPolygons = geometryEngine.cut(polygon, cutLine);
+    
+                if (cutPolygons && cutPolygons.length > 0) {
+                  // Kəsilən yeni poliqonları ekrana elave et
+                  cutPolygons.forEach(function(newPolygon) {
+                    var newGraphic = new Graphic({
+                      geometry: newPolygon,
+                      symbol: selectedGraphic.symbol 
+                    });
+                    view.graphics.add(newGraphic);
+    
+                 
+                    splittedPolygons.push(newPolygon);
+                  });
+    
+              
+                  view.graphics.remove(selectedGraphic);
+                  selectedGraphic = null;
+                }
+    
+                // Sketch widget bağla
+                view.ui.remove(splitSketch);
+                splitSketch.destroy();
+              }
+            });
+          });
+    
+          // ---------------------------
+          // Save button
+          // ---------------------------
+          document.getElementById('analyzeSaveButton').addEventListener('click', function() {
+            if (!splittedPolygons.length) {
+              alert("Hal-hazırda heç bir əməliyyat aparılmayıb");
+              return;
+            }
+            if(!originalObjectID){
+              alert("Seçilən poliqonun object id məlumatı yoxdur");
+              return;
+            }
+          
+           
+            var features = splittedPolygons.map(function(poly, idx) {
+              return {
+                type: "Feature",
+                properties: {
+                
+                  OBJECTID: originalObjectID + 100 + idx,
+                  Sahe: 999,
+                  Meh_T: "Taxıl"
+                },
+                geometry: esriPolygonToGeoJSON(poly)
+              };
+            });
+          
+            var geojsonData = {
+              type: "FeatureCollection",
+              features: features
+            };
+          
+
+            fetch("/save-geojson/", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json"
+              },
+              body: JSON.stringify({
+                filename: "torpaq.geojson",
+                data: geojsonData,
+                original_object_id: originalObjectID
+              })
+            })
+            .then(response => response.json())
+            .then(result => {
+              if (result.status === "ok") {
+                alert("Torpaq məlumatları yadda saxlandı");
+                splittedPolygons = [];
+                originalObjectID = null;
+                geoJsonLayer3.refresh();
+              } else {
+                alert("Yadda saxlama prosesində xəta baş verdi: " + result.message);
+              }
+            })
+            .catch(err => {
+              console.error(err);
+              alert("Servere yazarkən xəta yarandı");
+            });
+          });
+          
+    
+          
+          function esriPolygonToGeoJSON(esriPolygon) {
+ 
+            return {
+              type: "Polygon",
+              coordinates: esriPolygon.rings
+            };
+          }
+    
+  
+          function openChartModal(yearLabels, mehValues) {
+            var chartModal = document.getElementById('chartModal');
+            chartModal.style.display = 'block';
+            var canvas = document.getElementById('chartCanvas');
+            var ctx = canvas.getContext('2d');
+    
+            if (myChart) { myChart.destroy(); myChart = null; }
+    
+            myChart = new Chart(ctx, {
+              type: 'line',
+              data: {
+                labels: yearLabels,
+                datasets: [{
+                  label: 'Mehsuldarlıq (kg/ha)',
+                  data: mehValues,
+                  borderColor: 'rgba(75,192,192,1)',
+                  backgroundColor: 'rgba(75,192,192,0.2)',
+                  fill: false,
+                  tension: 0.1
+                }]
+              },
+              options: {
+                responsive: false,
+                plugins: {
+                  title: {
+                    display: true,
+                    text: 'Illərə Görə Məhsuldarlıq'
+                  }
+                },
+                scales: {
+                  y: {
+                    beginAtZero: true,
+                    title: { display: true, text: 'kg/ha' }
+                  },
+                  x: {
+                    title: { display: true, text: 'İl' }
+                  }
+                }
+              }
+            });
+          }
+    
+          // Chart Modal Azot Fonksiyonu
+          function openChartModalAzot(yearLabels, azotVals, mehVals) {
+            var chartModal = document.getElementById('chartModal');
+            chartModal.style.display = 'block';
+            var canvas = document.getElementById('chartCanvas');
+            var ctx = canvas.getContext('2d');
+    
+            if (myChart) { myChart.destroy(); myChart = null; }
+    
+            myChart = new Chart(ctx, {
+              type: 'line',
+              data: {
+                labels: yearLabels,
+                datasets: [
+                  {
+                    label: 'Azot (kg/ha)',
+                    data: azotVals,
+                    borderColor: 'orange',
+                    backgroundColor: 'rgba(255,165,0,0.2)',
+                    fill: false,
+                    yAxisID: 'AzotAxis'
+                  },
+                  {
+                    label: 'Mehsuldarlıq (kg/ha)',
+                    data: mehVals,
+                    borderColor: 'blue',
+                    backgroundColor: 'rgba(75,192,192,0.2)',
+                    fill: false,
+                    yAxisID: 'MehAxis'
+                  }
+                ]
+              },
+              options: {
+                responsive: false,
+                scales: {
+                  AzotAxis: {
+                    type: 'linear',
+                    position: 'left',
+                    title: { display: true, text: 'Azot (kg/ha)' }
+                  },
+                  MehAxis: {
+                    type: 'linear',
+                    position: 'right',
+                    title: { display: true, text: 'Mehsuldarlıq (kg/ha)' }
+                  }
+                },
+                plugins: {
+                  title: {
+                    display: true,
+                    text: 'Azot Miqdarı və Mehsuldarlıq arasındakı əlaqə'
+                  }
+                }
+              }
+            });
+          }
+
+          // ---------------------------
+          // Shapefile Yükleme
+          // ---------------------------
+
+
+          var analyzeClickButton = document.getElementById("analyzeclickButton");
+          var shapefileInput = document.getElementById("shapefileInput");
+
+
+          analyzeClickButton.addEventListener("click", function() {
+              shapefileInput.click();
+          });
+
+    
+          shapefileInput.addEventListener("change", function(event) {
+              var file = event.target.files[0];
+              if (file) {
+                  var reader = new FileReader();
+
+                  reader.onload = function(e) {
+                      var arrayBuffer = e.target.result;
+
+                    
+                      shp(arrayBuffer).then(function(geojson) {
+                 
+                          console.log("Yüklenen GeoJSON datasi:", geojson);
+
+                          
+                          var featureLayer = new GeoJSONLayer({
+                              source: geojson.features.map(function(feature, index) {
+                          
+                                  if (!feature.properties.ObjectID) {
+                                      feature.properties.ObjectID = index + 1;
+                                  }
+                                  return {
+                                      geometry: feature.geometry,
+                                      attributes: feature.properties
+                                  };
+                              }),
+                              objectIdField: "ObjectID",
+                              geometryType: getGeometryType(geojson),
+                              fields: generateFields(geojson), 
+                              renderer: {
+                                  type: "simple",
+                                  symbol: getDefaultSymbol(getGeometryType(geojson))
+                              }
+                          });
+
+                          // add to map
+                          map.add(featureLayer);
+
+                          // view on map
+                          view.goTo({
+                              target: featureLayer.fullExtent
+                          }).catch(function(error) {
+                              console.error("Xeritede zoom edilerken xeta yarandi:", error);
+                          });
+
+                      }).catch(function(error) {
+                          console.error("Xəta:", error);
+                          alert("Shapefile oxunarken xeta yarandi");
+                      });
+                  };
+
+                  reader.readAsArrayBuffer(file);
+              }
+          });
+
+         
+          function getGeometryType(geojson) {
+              if (!geojson.features || geojson.features.length === 0) {
+                  return "polygon";
+              }
+              var geometryType = geojson.features[0].geometry.type;
+              switch (geometryType) {
+                  case "Point":
+                  case "MultiPoint":
+                      return "point";
+                  case "LineString":
+                  case "MultiLineString":
+                      return "polyline";
+                  case "Polygon":
+                  case "MultiPolygon":
+                      return "polygon";
+                  default:
+                      return "polygon";
+              }
+          }
+
+        
+          function generateFields(geojson) {
+              if (!geojson.features || geojson.features.length === 0) {
+                  return [];
+              }
+              var properties = geojson.features[0].properties;
+              var fields = [];
+
+         
+              fields.push({
+                  name: "ObjectID",
+                  alias: "ObjectID",
+                  type: "oid"
+              });
+
+              for (var key in properties) {
+                  if (properties.hasOwnProperty(key)) {
+                      var fieldType = typeof properties[key];
+                      var type;
+
+                      switch (fieldType) {
+                          case "number":
+                              type = "double";
+                              break;
+                          case "boolean":
+                              type = "boolean";
+                              break;
+                          default:
+                              type = "string";
+                      }
+
+                      fields.push({
+                          name: key,
+                          alias: key,
+                          type: type
+                      });
+                  }
+              }
+
+              return fields;
+          }
+
+ 
+          function getDefaultSymbol(geometryType) {
+              switch (geometryType) {
+                  case "point":
+                      return {
+                          type: "simple-marker",
+                          color: [255, 0, 0],
+                          outline: {
+                              color: [255, 255, 255],
+                              width: 1
+                          }
+                      };
+                  case "polyline":
+                      return {
+                          type: "simple-line",
+                          color: [0, 0, 255],
+                          width: 2
+                      };
+                  case "polygon":
+                      return {
+                          type: "simple-fill",
+                          color: [0, 0, 255, 0.5],
+                          outline: {
+                              color: [255, 255, 255],
+                              width: 1
+                          }
+                      };
+                  default:
+                      return {
+                          type: "simple-fill",
+                          color: [0, 0, 255, 0.5],
+                          outline: {
+                              color: [255, 255, 255],
+                              width: 1
+                          }
+                      };
+              }
+          }
+
+          // ---------------------------
+          // Shapefile Yükleme Son
+          // ---------------------------
+    
+        });
+    
+      });
+    </script>
+
+    
+  </div>
+
+
+  <div id="chartModal">
+    <div id="chartModalContent">
+
+      <button id="downloadChart">Yüklə</button>
+      <button id="closeChartModal">X</button>
+      <h3>Mehsuldarlıq Analizi</h3>
+      <canvas id="chartCanvas" width="600" height="300"></canvas>
+    </div>
+  </div>
+
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function(){
+      var closeBtn=document.getElementById('closeChartModal');
+      closeBtn.addEventListener('click',function(){
+        document.getElementById('chartModal').style.display='none';
+      });
+
+      var downloadBtn=document.getElementById('downloadChart');
+      downloadBtn.addEventListener('click',function(){
+        const canvas=document.getElementById('chartCanvas');
+        const link=document.createElement('a');
+        link.download='analysis_chart.png';
+        link.href=canvas.toDataURL('image/png');
+        link.click();
+      });
+
+      var closeColorPicker=document.getElementById('closeColorPicker');
+      if(closeColorPicker){
+        closeColorPicker.addEventListener('click',function(){
+          document.getElementById('colorPickerDialog').style.display='none';
+        });
+      }
+    });
+  </script>
+
+
+  <div class="side-panel" id="layerPanel">
+    <h3>Laylar</h3>
+
+
+    <div class="checkbox-container" id="container-az" draggable="true">
+      <input type="checkbox" id="torpaqLayer" checked>
+      <label for="torpaqLayer">Torpaq kənar sərhədi</label>
+      <button id="azColorButton" style="float:right; margin-left:10px;">
+        <img class="stylecolorimg" src="{% static 'img/color.png' %}" alt="color">
+      </button>
+    </div>
+
+    <div class="checkbox-container" id="container-rayon" draggable="true">
+      <input type="checkbox" id="tikiliLayer" checked>
+      <label for="tikiliLayer">Rayon Sərhədləri</label>
+      <button id="rayonColorButton" style="float:right; margin-left:10px;">
+        <img class="stylecolorimg" src="{% static 'img/color.png' %}" alt="color">
+      </button>
+    </div>
+
+    <div class="checkbox-container" id="container-torpaq" draggable="true">
+      <input type="checkbox" id="yolLayer" checked>
+      <label for="yolLayer">Torpaqlar</label>
+      <button id="torpaqColorButton" style="float:right; margin-left:10px;">
+        <img class="stylecolorimg" src="{% static 'img/color.png' %}" alt="color">
+      </button>
+    </div>
+  </div>
+
+  
+  <div id="colorPickerDialog" class="color-picker-dialog">
+    <input type="color" id="colorInput">
+    <button id="closeColorPicker">Bağla</button>
+  </div>
+
+
+  <script src="{% static 'assets/map.js' %}"></script>
+</body>
+</html>

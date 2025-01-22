@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <title>Giriş Səhifəsi</title>
+</head>
+<body>
+    <div class="login-container">
+        <h1>Giriş et</h1>
+        <form method="POST" action="{% url 'login' %}">{% csrf_token %}
+            <input type="text" name="username" placeholder="İstifadəçi adı" required>
+            <input type="password" name="password" placeholder="Şifrə" required>
+            <button type="submit">Giriş et</button>
+        </form>
+
+        {% if messages %}
+            <ul>
+                {% for message in messages %}
+                    <li>{{ message }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    </div>
+</body>
+</html>

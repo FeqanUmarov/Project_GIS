@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Profile</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/profile.css' %}">
+</head>
+<body>
+    <div class="container">
+        <div class="profile-header">
+            <div class="profile-img">
+                <img src="{% static 'img/user.png' %}" alt="Profile Image">
+            </div>
+            <div class="profile-info">
+                <h2>{{ user.first_name }} {{ user.last_name }}</h2>
+                <p>{{ user.email }}</p>
+                <p>{{ user.username }}</p>
+            </div>
+        </div>
+
+        <div class="profile-body">
+            <h3>Profil Məlumatları</h3>
+            <div class="profile-details">
+                <div class="profile-detail">
+                    <strong>Adı:</strong> {{ user.first_name }}
+                </div>
+                <div class="profile-detail">
+                    <strong>Soyadı:</strong> {{ user.last_name }}
+                </div>
+                <div class="profile-detail">
+                    <strong>Email:</strong> {{ user.email }}
+                </div>
+                <div class="profile-detail">
+                    <strong>İstifadəçi adı:</strong> {{ user.username }}
+                </div>
+                <div class="profile-detail">
+                    <strong>Qeydiyyat tarixi:</strong> {{ user.date_joined|date:"F d, Y" }}
+                </div>
+            </div>
+
+            <div class="profile-actions">
+                <a href="{% url 'editprofile' %}" class="btn">Məlumatları yenilə</a>
+                <a href="{% url 'logout' %}" class="btn btn-logout">Çıxış et</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

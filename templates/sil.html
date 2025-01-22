@@ -1,0 +1,140 @@
+require([
+  "esri/Map",
+  "esri/views/MapView",
+  "esri/layers/TileLayer",
+  "esri/layers/GeoJSONLayer",
+  "esri/Graphic",
+  "esri/geometry/Point"
+], function (Map, MapView, TileLayer, GeoJSONLayer, Graphic, Point) {
+
+  var imageryLayer = new TileLayer({
+    url: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer"
+  });
+
+  var map = new Map({
+    layers: [imageryLayer]
+  });
+
+  var view = new MapView({
+    container: "map",
+    map: map,
+    center: [47.5721, 40.1431],
+    zoom: 8
+  });
+
+  var geoJsonLayer = new GeoJSONLayer({
+    url: "/user-geojson/",
+    renderer: {
+      type: "simple",
+      symbol: {
+        type: "simple-line",
+        color: "blue",
+        width: 2
+      }
+    }
+  });
+
+  var geoJsonLayer2 = new GeoJSONLayer({
+    url: "{% static 'geojson/rayon.geojson' %}",
+    renderer: {
+      type: "simple",
+      symbol: {
+        type: "simple-line",
+        color: "green",
+        width: 2
+      }
+    }
+  });
+
+  var geoJsonLayer3 = new GeoJSONLayer({
+    url: "{% static 'geojson/torpaq.geojson' %}",
+    outFields: ["*"],
+    renderer: {
+      type: "simple",
+      symbol: {
+        type: "simple-fill",
+        color: "orange",
+        style: "solid",
+        outline: { color: "black", width: 1 }
+      }
+    }
+  });
+
+  map.addMany([geoJsonLayer, geoJsonLayer2, geoJsonLayer3]);
+
+  var selectedGraphic = null;
+  var moveActive = false;
+
+  // Harita tıklama
+  view.on("click", function(event) {
+    view.hitTest(event).then(function(response) {
+      if (response.results.length) {
+        var filteredResults = response.results.filter(function(r) {
+          return r.graphic.layer === geoJsonLayer 
+              || r.graphic.layer === geoJsonLayer2
+              || r.graphic.layer === geoJsonLayer3;
+        });
+        if (filteredResults.length > 0) {
+          var graphic = filteredResults[0].graphic;
+          console.log("Seçilen Graphic:", graphic);
+
+          graphic.symbol = {
+            type: "simple-fill",
+            color: [255,0,0,0.5],
+            style: "solid",
+            outline: { color: [255,255,0], width:2 }
+          };
+
+          if (selectedGraphic) { view.graphics.remove(selectedGraphic); }
+          view.graphics.add(graphic);
+          selectedGraphic = graphic;
+        } else {
+          if (selectedGraphic) {
+            view.graphics.remove(selectedGraphic);
+            selectedGraphic = null;
+          }
+        }
+      }
+    });
+  });
+
+  // Move buttonuna tıklama
+  document.getElementById("analyzeMoveButton").addEventListener("click", function() {
+    if (selectedGraphic) {
+      moveActive = !moveActive; // Sürüklemeyi etkinleştir veya devre dışı bırak
+    }
+  });
+
+  // Sürükleme olaylarını dinle
+  view.on("pointer-move", function(event) {
+    if (moveActive && selectedGraphic) {
+      var mapPoint = view.toMap(event); // Harita noktasını al
+      selectedGraphic.geometry = new Point(mapPoint); // Geometriyi güncelle
+
+      // Grafiği güncelle
+      view.graphics.remove(selectedGraphic);
+      view.graphics.add(selectedGraphic);
+    }
+  });
+
+  // Sürüklemeyi başlat
+  view.on("pointer-down", function(event) {
+    if (moveActive && selectedGraphic) {
+      view.on("drag", function(event) {
+        var mapPoint = view.toMap(event); // Harita noktasını al
+        selectedGraphic.geometry = new Point(mapPoint); // Geometriyi güncelle
+
+        // Grafiği güncelle
+        view.graphics.remove(selectedGraphic);
+        view.graphics.add(selectedGraphic);
+      });
+    }
+  });
+
+  // Sürüklemeyi durdurma
+  view.on("pointer-up", function(event) {
+    if (moveActive) {
+      moveActive = false;
+    }
+  });
+});
